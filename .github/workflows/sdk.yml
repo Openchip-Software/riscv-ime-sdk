@@ -1,0 +1,415 @@
+# Builds the IME SDK image. The crosstool-NG toolchain and qemu are built
+# from source as separate component images, and only when GHCR does not
+# already hold an image with the same inputs.
+#
+#   resolve ──> component (matrix, only missing images) ──> sdk
+#
+# The toolchain and qemu images are tagged with the git tree hash of
+# build/<component>, which contains every input of the image: Dockerfile,
+# configuration and pins. The tag is a function of the inputs, not of the
+# branch, so a component built on a feature branch is reused by main after
+# the merge and by every other branch with the same inputs. A change outside
+# build/<component> never rebuilds it.
+#
+# Component images are a build cache keyed by their inputs. They are pushed
+# from every run in this repository, pull requests included, whatever the
+# publish decision below. Pull requests from forks cannot push; see the
+# condition of the component job.
+#
+# The SDK image is assembled from the component images in minutes. Whether
+# it is pushed depends on the trigger:
+#
+#   push to main                     -> built only, never pushed
+#   pull request                     -> built only, never pushed
+#   tag openchip-vYYYY.MM.DD         -> pushed as :openchip-vYYYY.MM.DD,
+#                                       then :latest moves to it
+#   workflow_dispatch, publish=on    -> pushed as :openchip-v<short-sha>
+#
+# A release tag must be openchip-v<sdk_version>, with sdk_version read from
+# sdk.lock.yaml. The resolve job fails otherwise, before anything is pushed.
+#
+# To release: bump sdk_version in components.yaml, run `make lock`, merge,
+# then push the tag openchip-v<sdk_version> (or create a GitHub Release with
+# that tag).
+#
+# To publish a test image from any branch, run this workflow from the
+# Actions tab on that branch with "publish" checked. It never moves :latest.
+#
+# A manual run with from-scratch rebuilds both components with no cache
+# under separate -verify-<run> tags. This catches builds that no longer
+# reproduce. These runs never push the SDK image.
+#
+# The apptainer publish job is disabled for now.
+#
+# GHCR is authenticated by the built-in GITHUB_TOKEN.
+name: sdk
+
+on:
+  pull_request:
+  # A GitHub Release creates its tag, which triggers this push event. A
+  # release event trigger would run the workflow a second time.
+  push:
+    branches: [main]
+    tags: ['openchip-v*']
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Push the image to GHCR
+        type: boolean
+        default: false
+      from-scratch:
+        description: Rebuild every component with no cache, ignoring existing images
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  packages: write
+
+# No workflow-level concurrency: a newer push must not cancel a component
+# build that takes hours and that the newer run would reuse. The sdk job
+# carries the per-ref rule instead.
+
+env:
+  # Docker rejects uppercase repository names, and github.repository_owner
+  # is "Openchip-Software"; expressions have no lowercase function.
+  REGISTRY: ghcr.io/openchip-software
+  BAKE_FILES: |
+    docker-bake.hcl
+    build/toolchain/pins.hcl
+    build/qemu/pins.hcl
+    build/sdk/pins.hcl
+  # The sdk job writes its own summary of the images. The build record
+  # artifact and the bake-action summary repeat the build log.
+  DOCKER_BUILD_RECORD_UPLOAD: false
+  DOCKER_BUILD_SUMMARY:       false
+
+jobs:
+  resolve:
+    runs-on: ubuntu-26.04
+    outputs:
+      build:          ${{ steps.r.outputs.build }}
+      toolchain:      ${{ steps.r.outputs.toolchain }}
+      toolchain-tree: ${{ steps.r.outputs.toolchain-tree }}
+      qemu:           ${{ steps.r.outputs.qemu }}
+      qemu-tree:      ${{ steps.r.outputs.qemu-tree }}
+      from-scratch:   ${{ steps.r.outputs.from-scratch }}
+    steps:
+      # On a pull request this is the merge commit: the trees that would land.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: ./.github/actions/setup-yq
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+
+      # The image tag of a release is the git tag, and the version label of
+      # the image is sdk_version from the lock. Both must name the same
+      # release. Fail here, before any component or SDK image is pushed.
+      - name: Check the release tag against sdk_version
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        run: |
+          set -euo pipefail
+          version=$(yq -r '.sdk_version' sdk.lock.yaml)
+          if ! [[ "$GITHUB_REF_NAME" =~ ^openchip-v[0-9]{4}\.[0-9]{2}\.[0-9]{2}$ ]]; then
+            echo "::error::release tag '$GITHUB_REF_NAME' is not openchip-vYYYY.MM.DD"
+            exit 1
+          fi
+          if [ "$GITHUB_REF_NAME" != "openchip-v$version" ]; then
+            echo "::error::release tag '$GITHUB_REF_NAME' != openchip-v<sdk_version> 'openchip-v$version'." \
+                 "Bump sdk_version in components.yaml, run 'make lock', merge, and tag that commit."
+            exit 1
+          fi
+          echo "release $GITHUB_REF_NAME matches sdk_version $version"
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Outputs the image reference and the tree hash of each component,
+      # and the list of components whose image does not exist yet.
+      - name: Resolve component images
+        id: r
+        env:
+          FROM_SCRATCH: ${{ inputs.from-scratch == true }}
+        run: |
+          set -euo pipefail
+          build='[]'
+          for c in toolchain qemu; do
+            tree=$(git rev-parse "HEAD:build/$c")
+            ref="$REGISTRY/riscv-ime-sdk-$c:$tree"
+            if [ "$FROM_SCRATCH" = true ]; then
+              ref="$ref-verify-$GITHUB_RUN_ID"
+              missing=true
+            elif out=$(docker buildx imagetools inspect "$ref" 2>&1); then
+              missing=false
+            elif grep -qiE 'not found|manifest unknown|name unknown' <<< "$out"; then
+              missing=true
+            else
+              # Not a missing image: rebuilding for hours would not help.
+              echo "$out"
+              exit 1
+            fi
+            echo "$c: $ref (missing: $missing)"
+            echo "$c=$ref"       >> "$GITHUB_OUTPUT"
+            echo "$c-tree=$tree" >> "$GITHUB_OUTPUT"
+            if [ "$missing" = true ]; then
+              build=$(jq -c --arg c "$c" '. + [$c]' <<< "$build")
+            fi
+          done
+          echo "build=$build"               >> "$GITHUB_OUTPUT"
+          echo "from-scratch=$FROM_SCRATCH" >> "$GITHUB_OUTPUT"
+
+  component:
+    needs: resolve
+    # A pull request from a fork gets a read-only GITHUB_TOKEN and no
+    # secrets, so it cannot build or push a component. It is skipped here,
+    # and the sdk job then runs only if no component image was missing.
+    if: >-
+      needs.resolve.outputs.build != '[]'
+      && (github.event_name != 'pull_request'
+          || github.event.pull_request.head.repo.full_name == github.repository)
+    # No job name: GitHub does not expand a matrix expression in the name
+    # of a skipped job. The default name is "component (<component>)".
+    strategy:
+      fail-fast: false
+      matrix:
+        component: ${{ fromJSON(needs.resolve.outputs.build) }}
+    runs-on: ubuntu-26.04
+    # The GitHub-hosted ceiling is 6 h. A toolchain build on 2 CPUs takes 1-3 h.
+    timeout-minutes: 350
+    # One build per image. A second run that needs the same image waits here,
+    # then finds the image in the existence check below and skips the build.
+    concurrency:
+      group: component-${{ needs.resolve.outputs[matrix.component] }}
+      cancel-in-progress: false
+    env:
+      REF:  ${{ needs.resolve.outputs[matrix.component] }}
+      TREE: ${{ needs.resolve.outputs[format('{0}-tree', matrix.component)] }}
+    steps:
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check whether another run has pushed the image
+        id: check
+        run: |
+          if docker buildx imagetools inspect "$REF" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::$REF was pushed by another run; not rebuilding"
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.check.outputs.exists != 'true'
+
+      - uses: ./.github/actions/free-disk
+        if: steps.check.outputs.exists != 'true'
+
+      - name: Runner resources
+        if: steps.check.outputs.exists != 'true'
+        run: |
+          nproc; free -h; df -h /
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        if: steps.check.outputs.exists != 'true'
+
+      # The component repos are public. BuildKit fetches them anonymously.
+      - name: Build and push ${{ matrix.component }}
+        if: steps.check.outputs.exists != 'true'
+        uses: docker/bake-action@018cb6412ab401ebaa809aa5f85966b74628600f # v7.4.0
+        with:
+          source: .
+          files: ${{ env.BAKE_FILES }}
+          targets: ${{ matrix.component }}
+          push: true
+          no-cache: ${{ needs.resolve.outputs.from-scratch }}
+          set: |
+            ${{ matrix.component }}.tags=${{ env.REF }}
+            ${{ matrix.component }}.labels.eu.openchip.ime.tree=${{ env.TREE }}
+            ${{ matrix.component }}.labels.org.opencontainers.image.revision=${{ github.sha }}
+
+      - name: Disk usage
+        if: always() && steps.check.outputs.exists != 'true'
+        run: |
+          df -h /
+          docker buildx du || true
+
+  sdk:
+    needs: [resolve, component]
+    # Run when every missing component was built, or none was missing. A
+    # skipped component job with missing images means a fork pull request.
+    if: >-
+      !cancelled() && needs.resolve.result == 'success'
+      && (needs.component.result == 'success'
+          || (needs.component.result == 'skipped' && needs.resolve.outputs.build == '[]'))
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    # A newer push to a feature branch supersedes the running assembly.
+    # Runs on main are not cancelled, so that every merged commit gets a
+    # finished build. Runs on a release tag are not cancelled because they
+    # publish. The from-scratch runs use their own group, so that they never
+    # displace a queued run on main.
+    concurrency:
+      group: sdk-${{ github.ref }}${{ inputs.from-scratch == true && '-verify' || '' }}
+      cancel-in-progress: ${{ github.ref != 'refs/heads/main' && github.ref_type != 'tag' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-yq
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # A release tag publishes under its own name; the resolve job has
+      # checked it against sdk_version. Every other run uses the commit
+      # name. On a pull request github.sha is the temporary merge commit,
+      # so that name uses the head commit of the PR branch instead.
+      - name: Resolve tag and publish decision
+        id: v
+        env:
+          SHA:          ${{ github.event.pull_request.head.sha || github.sha }}
+          EVENT:        ${{ github.event_name }}
+          PUBLISH_IN:   ${{ inputs.publish == true }}
+          FROM_SCRATCH: ${{ needs.resolve.outputs.from-scratch }}
+        run: |
+          set -euo pipefail
+          IMAGE="$REGISTRY/riscv-ime-sdk:openchip-v${SHA::7}"
+          PUBLISH=false
+          if [ "$FROM_SCRATCH" = true ]; then
+            PUBLISH=false
+          elif [ "$EVENT" = push ] && [ "$GITHUB_REF_TYPE" = tag ]; then
+            IMAGE="$REGISTRY/riscv-ime-sdk:$GITHUB_REF_NAME"
+            PUBLISH=true
+          elif [ "$EVENT" = workflow_dispatch ] && [ "$PUBLISH_IN" = true ]; then
+            PUBLISH=true
+          fi
+          {
+            echo "image=${IMAGE}"
+            echo "publish=${PUBLISH}"
+            echo "version=$(yq -r '.sdk_version' sdk.lock.yaml)"
+            echo "lock-digest=$(sha256sum sdk.lock.yaml | cut -d' ' -f1)"
+          } >> "$GITHUB_OUTPUT"
+          echo "image=${IMAGE} publish=${PUBLISH}"
+
+      # Pin each component by digest, so that the assembly is immutable and
+      # the SDK image records exactly what it was built from.
+      - name: Pin the component images by digest
+        id: c
+        run: |
+          set -euo pipefail
+          for c in toolchain qemu; do
+            case $c in
+              toolchain) ref='${{ needs.resolve.outputs.toolchain }}' ;;
+              qemu)      ref='${{ needs.resolve.outputs.qemu }}' ;;
+            esac
+            digest=$(docker buildx imagetools inspect "$ref" --format '{{json .Manifest}}' | jq -r .digest)
+            pinned="${ref%:*}@${digest}"
+            echo "$c: $pinned"
+            echo "$c=$pinned" >> "$GITHUB_OUTPUT"
+          done
+
+      # No later step runs the image, so an image that is not pushed is not
+      # loaded into the local docker either. Its output is the build cache only,
+      # which BuildKit otherwise warns about.
+      - name: Assemble the SDK image
+        id: bake
+        uses: docker/bake-action@018cb6412ab401ebaa809aa5f85966b74628600f # v7.4.0
+        env:
+          LOCK_DIGEST: ${{ steps.v.outputs.lock-digest }}
+        with:
+          source: .
+          files: ${{ env.BAKE_FILES }}
+          targets: sdk
+          push: ${{ steps.v.outputs.publish }}
+          set: |
+            sdk.tags=${{ steps.v.outputs.image }}
+            sdk.labels.org.opencontainers.image.version=${{ steps.v.outputs.version }}
+            sdk.labels.org.opencontainers.image.revision=${{ github.sha }}
+            sdk.labels.eu.openchip.ime.toolchain=${{ steps.c.outputs.toolchain }}
+            sdk.labels.eu.openchip.ime.qemu=${{ steps.c.outputs.qemu }}
+            sdk.contexts.toolchain=docker-image://${{ steps.c.outputs.toolchain }}
+            sdk.contexts.qemu=docker-image://${{ steps.c.outputs.qemu }}
+            ${{ steps.v.outputs.publish != 'true' && 'sdk.output=type=cacheonly' || '' }}
+
+      - name: Output the pushed image by digest
+        id: push
+        if: steps.v.outputs.publish == 'true'
+        env:
+          METADATA: ${{ steps.bake.outputs.metadata }}
+        run: |
+          set -euo pipefail
+          digest=$(jq -r '.sdk["containerimage.digest"]' <<< "$METADATA")
+          echo "image=$REGISTRY/riscv-ime-sdk@${digest}" >> "$GITHUB_OUTPUT"
+          echo "::notice::SDK image $REGISTRY/riscv-ime-sdk@${digest}"
+
+      # The tag is re-pointed in the registry, so nothing is rebuilt or
+      # re-uploaded. A re-run of an older release, or an older release run
+      # that finishes last, must not move :latest back. The date in the tag
+      # name orders the releases.
+      - name: Move :latest to the release image
+        if: >-
+          steps.v.outputs.publish == 'true'
+          && github.event_name == 'push' && github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMAGE:    ${{ steps.push.outputs.image }}
+        run: |
+          set -euo pipefail
+          newest=$(gh api --paginate "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/openchip-v" --jq '.[].ref' \
+                   | sed 's|^refs/tags/||' \
+                   | grep -E '^openchip-v[0-9]{4}\.[0-9]{2}\.[0-9]{2}$' | sort | tail -n 1)
+          if [ "$newest" != "$GITHUB_REF_NAME" ]; then
+            echo "::notice::$newest is a newer release than $GITHUB_REF_NAME; not moving :latest"
+            exit 0
+          fi
+          docker buildx imagetools create -t "$REGISTRY/riscv-ime-sdk:latest" "$IMAGE"
+
+      # One table on the run page: which component images were reused or
+      # built, and whether the SDK image was pushed.
+      - name: Summary
+        if: ${{ !cancelled() }}
+        env:
+          BUILD:        ${{ needs.resolve.outputs.build }}
+          FROM_SCRATCH: ${{ needs.resolve.outputs.from-scratch }}
+          TOOLCHAIN:    ${{ steps.c.outputs.toolchain || needs.resolve.outputs.toolchain }}
+          QEMU:         ${{ steps.c.outputs.qemu || needs.resolve.outputs.qemu }}
+          IMAGE:        ${{ steps.v.outputs.image }}
+          PUSHED:       ${{ steps.push.outputs.image }}
+          ASSEMBLY:     ${{ steps.bake.outcome }}
+          EVENT:        ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          row() { printf '| %s | %s | %s |\n' "$1" "\`$2\`" "$3"; }
+          {
+            echo '| image | reference | status |'
+            echo '| --- | --- | --- |'
+            for c in toolchain qemu; do
+              case $c in toolchain) ref=$TOOLCHAIN ;; qemu) ref=$QEMU ;; esac
+              if ! jq -e --arg c "$c" 'index($c)' <<< "$BUILD" >/dev/null; then
+                status=reused
+              elif [ "$FROM_SCRATCH" = true ]; then
+                status='built with no cache'
+              else
+                status='built in this run'
+              fi
+              row "$c" "$ref" "$status"
+            done
+            if [ "$ASSEMBLY" != success ]; then
+              row sdk "$IMAGE" "assembly $ASSEMBLY"
+            elif [ -n "$PUSHED" ]; then
+              row sdk "$PUSHED" "pushed as \`${IMAGE##*/}\`"
+            else
+              case $EVENT in
+                pull_request)      why='pull request' ;;
+                push)              why='push to a branch' ;;
+                workflow_dispatch) why='publish not checked' ;;
+                *)                 why=$EVENT ;;
+              esac
+              [ "$FROM_SCRATCH" = true ] && why='from-scratch run'
+              row sdk "$IMAGE" "built, not pushed: $why"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

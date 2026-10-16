@@ -1,0 +1,28 @@
+# mikefarah/yq, pinned by version and SHA-256. Not apt: Ubuntu's `yq`
+# package is kislyuk/yq, a jq wrapper with different syntax and JSON output.
+#
+# To bump: take the yq_linux_amd64 SHA-256 from the release's `checksums`
+# file (column order is in `checksums_hashes_order`).
+name: Set up yq
+description: Install a pinned mikefarah/yq
+
+inputs:
+  version:
+    description: yq release tag
+    default: "v4.54.1"
+  sha256:
+    description: SHA-256 of yq_linux_amd64 for that release
+    default: "8e34fc298390875de416e6a4afcb8cabeceb25d9aa8506c1a2f9353cf702ea5f"
+
+runs:
+  using: composite
+  steps:
+    - name: Install yq ${{ inputs.version }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        curl -fsSL -o /tmp/yq \
+          "https://github.com/mikefarah/yq/releases/download/${{ inputs.version }}/yq_linux_amd64"
+        echo "${{ inputs.sha256 }}  /tmp/yq" | sha256sum -c -
+        sudo install -m0755 /tmp/yq /usr/local/bin/yq
+        yq --version

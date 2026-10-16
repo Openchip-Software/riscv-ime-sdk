@@ -1,0 +1,24 @@
+# SDK_VERSION has no default here. `make` passes it from sdk.lock.yaml:
+#   apptainer build --build-arg SDK_VERSION=<sdk_version> \
+#       riscv-ime-sdk-openchip-v<sdk_version>.sif build/sdk/sdk.def
+# Without --build-arg, apptainer stops with "build var SDK_VERSION is not
+# defined".
+Bootstrap: docker-daemon
+From: ghcr.io/openchip-software/riscv-ime-sdk:openchip-v{{ SDK_VERSION }}
+
+%labels
+    Author   openchip.com
+    Version  v{{ SDK_VERSION }}
+    MyLabel  OpenChip {{ SDK_VERSION }} IME tools
+
+%help
+    Container with toolchains, sysroot and emulators for IME Option G development.
+    This installation is based on Ubuntu 26.04.
+
+    Sources and build recipe: https://github.com/Openchip-Software/riscv-ime-sdk
+
+%environment
+    export RISCV_SYSROOT=/opt/openchip/toolchain/riscv64-openchip-linux-gnu/sysroot
+    export PATH=/opt/openchip/toolchain/bin:/opt/openchip/qemu/bin:$PATH
+    export QEMU_LD_PREFIX=/opt/openchip/toolchain/riscv64-openchip-linux-gnu/sysroot
+    export QEMU_CPU=max,x-zvvm=true,vlen=2048

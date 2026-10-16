@@ -1,0 +1,13 @@
+# Credentials — never commit.
+api_access_token
+*.pat
+*.token
+*.pem
+*.crt
+*.key
+
+# Build outputs
+*.sif
+*.tar.xz
+*.tar.zst
+sha256sums.txt

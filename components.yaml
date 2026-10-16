@@ -1,0 +1,40 @@
+---
+# components.yaml — hand-edited statement of intent.
+#
+# Refs here MAY be moving branches during development. They are NOT what
+# CI builds from: `make lock` resolves every ref to a commit SHA and writes
+# sdk.lock.yaml, and the lock is the only thing the build reads.
+#
+#   intent floats  ->  components.yaml
+#   the lock pins  ->  sdk.lock.yaml
+
+schema: 2
+sdk_version: "2026.10.14"
+
+# Base image of every build stage. `make lock` pins it by digest, so a
+# republished tag cannot change a build silently.
+base_image: ubuntu:26.04
+
+components:
+  crosstools-ng:
+    repo: https://github.com/Openchip-Software/riscv-ime-crosstool-NG.git
+    ref:  vrull/gcc16-libatomic
+  binutils-gdb:
+    repo: https://github.com/Openchip-Software/riscv-ime-binutils.git
+    ref:  vrull/ime-poc/20260504
+  gcc:
+    repo: https://github.com/Openchip-Software/riscv-ime-gcc.git
+    ref:  ime-cleanup
+  qemu:
+    repo: https://github.com/Openchip-Software/riscv-ime-qemu.git
+    ref:  vrull/ime-wip
+
+# Build stages, not repos. Each stage is a directory under build/, and
+# `make lock` writes the pins of the components it lists to
+# build/<stage>/pins.hcl. CI tags each component image with the git tree
+# hash of its directory, so the image is rebuilt exactly when one of its
+# pins, its Dockerfile or its configuration changes.
+stages:
+  toolchain: [crosstools-ng, binutils-gdb, gcc]
+  qemu:      [qemu]
+  sdk:       []
