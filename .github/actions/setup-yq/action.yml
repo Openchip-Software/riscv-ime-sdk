@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Openchip and Software Technologies, S.L.
+# SPDX-License-Identifier: Apache-2.0
+
 # mikefarah/yq, pinned by version and SHA-256. Not apt: Ubuntu's `yq`
 # package is kislyuk/yq, a jq wrapper with different syntax and JSON output.
 #

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Openchip and Software Technologies, S.L.
+# SPDX-License-Identifier: Apache-2.0
+
 # defconfig.in — crosstool-NG configuration TEMPLATE, rendered by the
 # Dockerfile in this directory from the build args in pins.hcl.
 # Placeholders: @GCC_URL@ @GCC_REVISION@ @BINUTILS_URL@ @BINUTILS_REVISION@ @PKGVERSION@

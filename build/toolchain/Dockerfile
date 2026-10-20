@@ -1,4 +1,6 @@
 # syntax=docker/dockerfile:1
+# SPDX-FileCopyrightText: 2026 Openchip and Software Technologies, S.L.
+# SPDX-License-Identifier: Apache-2.0
 #
 # riscv64 cross toolchain: crosstool-NG builds binutils, gcc, glibc and gdb
 # into /opt/openchip/toolchain.

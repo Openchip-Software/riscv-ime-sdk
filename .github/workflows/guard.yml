@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Openchip and Software Technologies, S.L.
+# SPDX-License-Identifier: Apache-2.0
+
 # Cheap, always-on. Runs before anything expensive. `make check` runs the
 # same scripts locally.
 name: guard

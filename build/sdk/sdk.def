@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Openchip and Software Technologies, S.L.
+# SPDX-License-Identifier: Apache-2.0
+
 # SDK_VERSION has no default here. `make` passes it from sdk.lock.yaml:
 #   apptainer build --build-arg SDK_VERSION=<sdk_version> \
 #       riscv-ime-sdk-openchip-v<sdk_version>.sif build/sdk/sdk.def

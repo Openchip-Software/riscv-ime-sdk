@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Openchip and Software Technologies, S.L.
+# SPDX-License-Identifier: Apache-2.0
+
 # sdk.lock.yaml is the integration gate: nothing enters the SDK until a PR
 # bumps a SHA in it. It needs a named reviewer, not just a protected branch.
 /sdk.lock.yaml     @Openchip-Software/riscv-ime-team
