@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Openchip and Software Technologies, S.L.
+# SPDX-License-Identifier: Apache-2.0
+
 # docker-bake.hcl — the IME SDK build graph.
 #
 #   toolchain   build/toolchain   crosstool-NG toolchain, hours

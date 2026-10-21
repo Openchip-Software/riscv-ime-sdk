@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Openchip and Software Technologies, S.L.
+# SPDX-License-Identifier: Apache-2.0
+
 # The hosted runner leaves ~14 GB free on /, and a crosstool-NG build
 # needs more. Delete preinstalled SDKs that the component builds never use.
 # This reclaims 25-30 GB in about a minute.

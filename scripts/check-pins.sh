@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Openchip and Software Technologies, S.L.
+# SPDX-License-Identifier: Apache-2.0
+#
 # check-pins.sh — the mechanical enforcement behind "one home for every pin".
 #
 # Without this, refs drift back out of the lock and into Dockerfiles, CI

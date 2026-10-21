@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Openchip and Software Technologies, S.L.
+# SPDX-License-Identifier: Apache-2.0
+#
 # check-lock.sh — components.yaml, sdk.lock.yaml and build/*/pins.hcl agree.
 #
 # `make lock` writes the lock from the manifest and renders the pins from
