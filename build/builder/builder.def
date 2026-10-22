@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2026 Openchip and Software Technologies, S.L.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Internal builder of the SDK tarball, as an Apptainer image, for build
+# hosts without Docker. It is the equivalent of build/builder/Dockerfile;
+# keep the two in step. The resulting .sif is internal; not published.
+#
+# Build it from the repository root with `make builder.sif`, which passes
+# the pins from build/builder/pins.hcl:
+#   apptainer build --fakeroot \
+#       --build-arg BASE_IMAGE=<pinned image> \
+#       --build-arg CROSSTOOLS_NG_REPO=<repo> \
+#       --build-arg CROSSTOOLS_NG_COMMIT=<commit> \
+#       builder.sif build/builder/builder.def
+Bootstrap: docker
+From: {{ BASE_IMAGE }}
+
+%files
+    build/builder/install-packages.sh   /usr/local/libexec/sdk-builder/install-packages.sh
+    build/builder/build-crosstool-ng.sh /usr/local/libexec/sdk-builder/build-crosstool-ng.sh
+
+%post
+    export LC_ALL=C
+    export PATH=/opt/rh/gcc-toolset-14/root/usr/bin:$PATH
+    /usr/local/libexec/sdk-builder/install-packages.sh
+    /usr/local/libexec/sdk-builder/build-crosstool-ng.sh \
+        "{{ CROSSTOOLS_NG_REPO }}" "{{ CROSSTOOLS_NG_COMMIT }}"
+
+%environment
+    export LC_ALL=C
+    export TZ=Etc/UTC
+    export PATH=/opt/rh/gcc-toolset-14/root/usr/bin:/opt/crosstool-ng/bin:$PATH

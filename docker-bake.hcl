@@ -15,9 +15,9 @@
 #   docker buildx bake -f docker-bake.hcl \
 #     -f build/toolchain/pins.hcl -f build/qemu/pins.hcl -f build/sdk/pins.hcl sdk
 #
-# `make sdk` does this. With no overrides, `sdk` builds both components
-# from source. To use prebuilt component images instead, override the
-# contexts:
+# With no overrides, `sdk` builds both components from source. To use
+# prebuilt component images instead, override the contexts. `make sdk`
+# does this for each component image that exists in GHCR:
 #
 #   --set sdk.contexts.toolchain=docker-image://<registry>/riscv-ime-sdk-toolchain@sha256:...
 
@@ -58,11 +58,11 @@ target "qemu" {
   }
 }
 
-# The tag of a local build: the name a release of this sdk_version gets in
-# GHCR, and the one build/sdk/sdk.def expects. CI sets its own tag with
+# The tag of a local build, and the one build/sdk/sdk.def expects. A local
+# name only: the SDK image is never pushed. CI sets its own tag with
 # --set sdk.tags.
 target "sdk-tag" {
-  tags = ["${REGISTRY}/riscv-ime-sdk:openchip-v${SDK_VERSION}"]
+  tags = ["riscv-ime-sdk:openchip-v${SDK_VERSION}"]
 }
 
 target "sdk" {

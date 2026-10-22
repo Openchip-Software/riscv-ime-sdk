@@ -1,0 +1,74 @@
+# SPDX-FileCopyrightText: 2026 Openchip and Software Technologies, S.L.
+# SPDX-License-Identifier: Apache-2.0
+
+# defconfig.in — crosstool-NG configuration TEMPLATE of the SDK tarball,
+# rendered by scripts/build-sdk.sh from build/release/pins.hcl.
+# Placeholders: @GCC_URL@ @GCC_REVISION@ @BINUTILS_URL@ @BINUTILS_REVISION@
+#               @PKGVERSION@ @PREFIX@ @TARBALLS_DIR@ @PYTHON@
+#
+# It is build/toolchain/defconfig.in plus the settings that make the
+# toolchain portable, each commented below. Every
+# CT_* symbol here exists in the pinned crosstool-NG; check its config/**/*.in
+# before adding one. Keep this file in savedefconfig form: only values that
+# differ from the crosstool-NG defaults.
+CT_CONFIG_VERSION="4"
+CT_EXPERIMENTAL=y
+CT_DEBUG_CT=y
+# The SDK root. scripts/build-sdk.sh has already installed the gdb Python
+# and the QEMU host libraries under @PREFIX@/host, so crosstool-NG must not
+# remove the prefix before building.
+CT_PREFIX_DIR="@PREFIX@"
+# CT_RM_RF_PREFIX_DIR is not set
+CT_PREFIX_DIR_RO=y
+# Keep every downloaded tarball: the source tarball is built from them.
+CT_LOCAL_TARBALLS_DIR="@TARBALLS_DIR@"
+CT_SAVE_TARBALLS=y
+CT_LOG_TO_FILE=y
+CT_LOG_FILE_COMPRESS=y
+# CT_LOG_PROGRESS_BAR is not set
+# Link libstdc++ and libgcc into every host executable, so that only glibc
+# comes from the consumer's system. -L lets gdb link the shared libpython
+# in @PREFIX@/host/lib: python-config gives no -L for a shared libpython.
+# crosstool-NG's own -L for its static companion libraries comes first.
+CT_EXTRA_LDFLAGS_FOR_HOST="-static-libstdc++ -static-libgcc -L@PREFIX@/host/lib"
+CT_ARCH_RISCV=y
+CT_ARCH_USE_MMU=y
+CT_ARCH_64=y
+# CT_SHOW_CT_VERSION is not set
+CT_TOOLCHAIN_PKGVERSION="@PKGVERSION@"
+CT_TARGET_VENDOR="openchip"
+CT_KERNEL_LINUX=y
+CT_BINUTILS_SRC_DEVEL=y
+CT_BINUTILS_DEVEL_URL="@BINUTILS_URL@"
+# Pin the exact commit, not the branch.
+CT_BINUTILS_DEVEL_REVISION="@BINUTILS_REVISION@"
+CT_BINUTILS_PLUGINS=y
+CT_BINUTILS_EXTRA_CONFIG_ARRAY="--with-priv-spec=1.13"
+CT_GLIBC_USE_LIBIDN_ADDON=y
+CT_GLIBC_KERNEL_VERSION_CHOSEN=y
+CT_GLIBC_MIN_KERNEL_VERSION="4.15.0"
+CT_GCC_SRC_DEVEL=y
+CT_GCC_DEVEL_URL="@GCC_URL@"
+CT_GCC_DEVEL_REVISION="@GCC_REVISION@"
+CT_CC_GCC_STATIC_LIBSTDCXX=y
+# libcc1 serves only gdb's `compile` command, and libtool links it against
+# the system libstdc++ despite -static-libstdc++.
+CT_CC_GCC_EXTRA_CONFIG_ARRAY="--disable-libcc1"
+CT_CC_GCC_LIBMUDFLAP=y
+CT_CC_GCC_LIBGOMP=y
+CT_CC_GCC_LIBSSP=y
+CT_CC_GCC_LIBQUADMATH=y
+CT_CC_GCC_LIBSANITIZER=y
+CT_CC_LANG_CXX=y
+CT_DEBUG_GDB=y
+# The cross gdb embeds the CPython that scripts/build-sdk.sh installs under
+# @PREFIX@/host, not the builder's Python.
+CT_GDB_CROSS_PYTHON=y
+CT_GDB_CROSS_PYTHON_BINARY="@PYTHON@"
+CT_GDB_NATIVE=y
+CT_GDB_NATIVE_STATIC=y
+CT_COMP_LIBS_CLOOG=y
+CT_GMP_EXTRA_CFLAGS=""
+CT_COMP_LIBS_LIBELF=y
+# CT_NCURSES_NEW_ABI is not set
+CT_NCURSES_EXTRA_CFLAGS=""

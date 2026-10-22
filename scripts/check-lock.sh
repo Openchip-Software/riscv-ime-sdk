@@ -45,6 +45,8 @@ for c in $(yq -r '.components | keys | .[]' "$MANIFEST"); do
 done
 same base_image "$(yq -r '.base_image' "$MANIFEST")" \
                 "$(yq -r '.base_image.resolved_from' "$LOCK")"
+same builder_image "$(yq -r '.builder_image' "$MANIFEST")" \
+                   "$(yq -r '.builder_image.resolved_from' "$LOCK")"
 
 # The component image tags are git tree hashes of build/<stage>, so the pins
 # must be in those directories. Render them from the lock and compare with

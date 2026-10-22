@@ -1,0 +1,77 @@
+# SPDX-FileCopyrightText: 2026 Openchip and Software Technologies, S.L.
+# SPDX-License-Identifier: Apache-2.0
+
+# Builds the SDK tarball, the source tarball and SHA256SUMS
+# (scripts/build-sdk.sh), runs scripts/verify-sdk.sh on them, and keeps
+# dist/ as a workflow artifact.
+#
+# This workflow publishes no container image. The builder image is built
+# into the runner's local Docker and discarded with the runner. The token
+# can only read the repository.
+#
+# A full build takes hours, so it runs only when its inputs change, on a
+# release tag, and on demand.
+name: release
+
+on:
+  pull_request:
+    paths:
+      - build/builder/**
+      - build/release/**
+      - release/**
+      - scripts/build-sdk.sh
+      - scripts/package-sdk.sh
+      - scripts/verify-sdk.sh
+      - scripts/audit-linkage.sh
+      - tests/sdk/**
+      - .github/workflows/release.yml
+  push:
+    tags: ['openchip-v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+
+jobs:
+  tarball:
+    runs-on: ubuntu-26.04
+    # The GitHub-hosted ceiling is 6 h.
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: ./.github/actions/free-disk
+
+      # Upstream tarballs: crosstool-NG's downloads, the packed gcc and
+      # binutils-gdb commits, and build/release/sources.list. Keyed by
+      # every pin that selects them.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: work/tarballs
+          key: sdk-tarballs-${{ hashFiles('build/builder/pins.hcl', 'build/release/pins.hcl', 'build/release/sources.list', 'build/release/defconfig.in') }}
+          restore-keys: sdk-tarballs-
+
+      - name: Build the builder image (local only, never pushed)
+        run: make builder
+
+      - name: Build dist/
+        run: make release JOBS="$(nproc)"
+
+      - name: Verify dist/
+        run: make verify
+
+      - name: Disk usage
+        if: always()
+        run: df -h /
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: riscv-ime-sdk-dist
+          path: dist/
+          if-no-files-found: error
+          # Already xz-compressed.
+          compression-level: 0

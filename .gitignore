@@ -14,3 +14,7 @@ api_access_token
 *.tar.xz
 *.tar.zst
 sha256sums.txt
+
+# SDK tarball build (scripts/build-sdk.sh)
+/work/
+/dist/

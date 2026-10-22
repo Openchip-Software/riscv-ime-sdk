@@ -1,0 +1,48 @@
+# SPDX-FileCopyrightText: 2026 Openchip and Software Technologies, S.L.
+# SPDX-License-Identifier: Apache-2.0
+#
+# IME SDK Apptainer recipe. We ship this file; you build the image yourself.
+# Put it next to the SDK tarball and run (apptainer >= 1.3):
+#
+#   apptainer build --fakeroot \
+#       --build-arg SDK_TARBALL=riscv-ime-sdk-<version>-x86_64-linux.tar.xz \
+#       riscv-ime-sdk-<version>.sif sdk.def
+#
+# Any base image with glibc >= 2.28 works: change From freely. The SDK
+# needs nothing from the base image except glibc. The packages below are
+# conveniences for building projects with the SDK; xz-utils extracts the
+# tarball.
+Bootstrap: docker
+From: ubuntu:24.04
+
+%arguments
+    SDK_TARBALL=riscv-ime-sdk-VERSION-x86_64-linux.tar.xz
+
+# Not /tmp: %post sees the host's /tmp, not the image's.
+%files
+    {{ SDK_TARBALL }} /opt/sdk.tar.xz
+
+%post
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update
+    apt-get install -y --no-install-recommends make cmake ninja-build ca-certificates xz-utils
+    rm -rf /var/lib/apt/lists/*
+    tar -xJf /opt/sdk.tar.xz -C /opt
+    rm /opt/sdk.tar.xz
+    # The paths of the SDK images published before the SDK tarball existed.
+    mkdir -p /opt/openchip
+    ln -s /opt/sdk /opt/openchip/toolchain
+    ln -s /opt/sdk /opt/openchip/qemu
+
+%environment
+    # What /opt/sdk/share/sdk/env.sh sets.
+    export SDK_ROOT=/opt/sdk
+    export SDK_SYSROOT=/opt/sdk/riscv64-openchip-linux-gnu/sysroot
+    export RISCV_SYSROOT=/opt/sdk/riscv64-openchip-linux-gnu/sysroot
+    export QEMU_LD_PREFIX=/opt/sdk/riscv64-openchip-linux-gnu/sysroot
+    export QEMU_CPU=max,x-zvvm=true,vlen=2048
+    export PATH=/opt/sdk/bin:$PATH
+
+%help
+    IME SDK: riscv64-openchip-linux-gnu cross toolchain, sysroot, gdb and
+    QEMU, in /opt/sdk. See /opt/sdk/share/doc/sdk/README.md.

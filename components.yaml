@@ -18,6 +18,12 @@ sdk_version: "2026.10.14"
 # republished tag cannot change a build silently.
 base_image: ubuntu:26.04
 
+# Base image of build/builder, the internal image that builds the SDK
+# tarball. Its glibc (2.28) is the oldest glibc the tarball runs on, so
+# raising it raises that floor. `make lock` pins it by digest. The builder
+# image is internal and not published.
+builder_image: almalinux:8
+
 components:
   crosstools-ng:
     repo: https://github.com/Openchip-Software/riscv-ime-crosstool-NG.git
@@ -37,7 +43,13 @@ components:
 # build/<stage>/pins.hcl. CI tags each component image with the git tree
 # hash of its directory, so the image is rebuilt exactly when one of its
 # pins, its Dockerfile or its configuration changes.
+#
+# builder and release produce the SDK tarball, not an image. Their pins
+# use builder_image instead of base_image. builder bakes crosstool-NG into
+# the builder image; scripts/build-sdk.sh reads the release pins.
 stages:
   toolchain: [crosstools-ng, binutils-gdb, gcc]
   qemu:      [qemu]
   sdk:       []
+  builder:   [crosstools-ng]
+  release:   [binutils-gdb, gcc, qemu]

@@ -7,7 +7,7 @@
 # Without --build-arg, apptainer stops with "build var SDK_VERSION is not
 # defined".
 Bootstrap: docker-daemon
-From: ghcr.io/openchip-software/riscv-ime-sdk:openchip-v{{ SDK_VERSION }}
+From: riscv-ime-sdk:openchip-v{{ SDK_VERSION }}
 
 %labels
     Author   openchip.com
