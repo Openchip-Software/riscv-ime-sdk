@@ -1,13 +1,14 @@
 # SPDX-FileCopyrightText: 2026 Openchip and Software Technologies, S.L.
 # SPDX-License-Identifier: Apache-2.0
 
-# SDK_VERSION has no default here. `make` passes it from sdk.lock.yaml:
-#   apptainer build --build-arg SDK_VERSION=<sdk_version> \
+# SDK_IMAGE and SDK_VERSION have no defaults here. `make` passes the SDK
+# image tag it built and sdk_version from sdk.lock.yaml:
+#   apptainer build --build-arg SDK_IMAGE=<tag> \
+#       --build-arg SDK_VERSION=<sdk_version> \
 #       riscv-ime-sdk-openchip-v<sdk_version>.sif build/sdk/sdk.def
-# Without --build-arg, apptainer stops with "build var SDK_VERSION is not
-# defined".
+# Without --build-arg, apptainer stops with "build var ... is not defined".
 Bootstrap: docker-daemon
-From: ghcr.io/openchip-software/riscv-ime-sdk:openchip-v{{ SDK_VERSION }}
+From: {{ SDK_IMAGE }}
 
 %labels
     Author   openchip.com

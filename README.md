@@ -5,103 +5,128 @@ SPDX-License-Identifier: Apache-2.0
 
 # IME SDK
 
-This is Openchip's cross toolchain, sysroot and emulator for **RISC-V IME** 
-development, packaged as an OCI image and an Apptainer `.sif`.
+This is Openchip's cross toolchain, sysroot and emulator for **RISC-V IME**
+development. It ships as an OCI image, the **SDK image**, and as an
+**Apptainer image** (`.sif`) converted from it.
+
+`<version>` below is the SDK version, a date in the form `YYYY.MM.DD`.
+Each release is tagged `openchip-v<version>`.
 
 ## Use it
 
 ```sh
-# OCI image: a release by its version, or the newest release
-docker pull ghcr.io/openchip-software/riscv-ime-sdk:openchip-v<YYYY.MM.DD>
+# SDK image: a release by its version, or the newest release
+docker pull ghcr.io/openchip-software/riscv-ime-sdk:openchip-v<version>
 docker pull ghcr.io/openchip-software/riscv-ime-sdk:latest
 
-# Apptainer, converted from the OCI image
-apptainer pull riscv-ime-sdk-openchip-v<YYYY.MM.DD>.sif \
-    docker://ghcr.io/openchip-software/riscv-ime-sdk:openchip-v<YYYY.MM.DD>
-apptainer exec riscv-ime-sdk-openchip-v<YYYY.MM.DD>.sif riscv64-openchip-linux-gnu-gcc --version
+# Apptainer image, converted from the SDK image
+apptainer pull riscv-ime-sdk-openchip-v<version>.sif \
+    docker://ghcr.io/openchip-software/riscv-ime-sdk:openchip-v<version>
+apptainer exec riscv-ime-sdk-openchip-v<version>.sif riscv64-openchip-linux-gnu-gcc --version
 
-# OCI image as a file, for a machine without registry access
-docker save ghcr.io/openchip-software/riscv-ime-sdk:openchip-v<YYYY.MM.DD> \
-    | xz -T0 > riscv-ime-sdk-openchip-v<YYYY.MM.DD>.tar.xz
-docker load -i riscv-ime-sdk-openchip-v<YYYY.MM.DD>.tar.xz
+# Image archive: the SDK image as a file, for a machine without registry access
+docker save ghcr.io/openchip-software/riscv-ime-sdk:openchip-v<version> \
+    | xz -T0 > riscv-ime-sdk-openchip-v<version>.tar.xz
+docker load -i riscv-ime-sdk-openchip-v<version>.tar.xz
 ```
 
-Image publishing is handled by CI. A release tag `openchip-v<YYYY.MM.DD>`
-publishes the image under the same tag and moves `:latest` to it. See
-[DEVELOPERS.md](DEVELOPERS.md#ci) for when images get pushed, how to make a
-release, and how to publish a test image from a feature branch.
-
-The image provides:
+The SDK image provides:
 
 | Path | Contents |
 | --- | --- |
 | `/opt/openchip/toolchain` | gcc, binutils, gdb, glibc sysroot — `riscv64-openchip-linux-gnu-*` |
 | `/opt/openchip/qemu` | `qemu-riscv64`, `qemu-system-riscv64`, `qemu-system-riscv32` |
 
+Both directories are on `PATH`. `QEMU_LD_PREFIX` points at the sysroot,
+so `qemu-riscv64 ./prog` runs a dynamically linked program without `-L`.
+`QEMU_CPU` sets the default CPU model to `max,x-zvvm=true,vlen=2048`.
+
+CI publishes the SDK image. A release tag publishes it under the same
+tag and moves `:latest` to it. See [DEVELOPERS.md](DEVELOPERS.md#ci).
+
 ## Build it
 
+`make` builds the SDK image, the Apptainer image and the image archive
+from source, at the component commits pinned in `sdk.lock.yaml`.
+
+### Requirements
+
+- Docker with BuildKit and the `buildx` plugin. Check with
+  `docker buildx version`.
+- Apptainer 1.3 or later. It reads the SDK image from the local Docker
+  daemon, so the user running `make` needs access to Docker.
+- [mikefarah/yq](https://github.com/mikefarah/yq) v4. Ubuntu's apt `yq`
+  package is a different tool and does not work here; install yq from its
+  [releases](https://github.com/mikefarah/yq/releases).
+- `make`, `git` and `xz`.
+- About 20 GB of free disk space for Docker: about 16 GB of build cache
+  and 1.7 GB for the SDK image. The Apptainer image and the image archive
+  take about 0.7 GB more in the repo.
+- Network access to GitHub and Docker Hub. The component repos are
+  public, so no credentials are needed.
+
+Tested on x86-64 Linux. With an empty build cache, `make` took about one
+hour on a 12-core machine with 16 GB of RAM, almost all of it for the
+toolchain. Later builds reuse the build cache and take a few minutes.
+
+### Build
+
 ```sh
-make lock     # resolve components.yaml -> sdk.lock.yaml + build/*/pins.hcl
-make check    # no secrets, no internal hosts, no pins outside the lock
-make sdk      # build the image from source
-make          # + riscv-ime-sdk-openchip-v<sdk_version>.sif and .tar.xz
+git clone https://github.com/Openchip-Software/riscv-ime-sdk.git
+cd riscv-ime-sdk
+make
 ```
 
-`make sdk` runs `docker buildx bake` on [`docker-bake.hcl`](docker-bake.hcl)
-and always builds the toolchain and QEMU from source. The toolchain build
-takes hours. Other targets:
+`make` produces:
+
+| Output | Name | Where |
+| --- | --- | --- |
+| SDK image | `ghcr.io/openchip-software/riscv-ime-sdk:openchip-v<version>` | local Docker daemon |
+| Apptainer image | `riscv-ime-sdk-openchip-v<version>.sif` | repo root |
+| Image archive | `riscv-ime-sdk-openchip-v<version>.tar.xz` | repo root |
+
+`<version>` is `sdk_version` in `sdk.lock.yaml`. The SDK image gets the
+same tag as the published release of that version, and replaces a pulled
+copy of it in the local Docker daemon. To use another tag, set `IMAGE`:
+
+```sh
+make IMAGE=riscv-ime-sdk:local
+```
+
+### Check the build
+
+Compile a program with the toolchain and run it on QEMU:
+
+```sh
+printf '#include <stdio.h>\nint main(void) { puts("hello"); }\n' > hello.c
+apptainer exec riscv-ime-sdk-openchip-v<version>.sif \
+    sh -c 'riscv64-openchip-linux-gnu-gcc hello.c -o hello && qemu-riscv64 ./hello'
+```
+
+It prints `hello`. To check the SDK image directly:
+
+```sh
+docker run --rm ghcr.io/openchip-software/riscv-ime-sdk:openchip-v<version> \
+    riscv64-openchip-linux-gnu-gcc --version
+```
+
+### Make targets
 
 | Target | Does |
 | --- | --- |
-| `make toolchain`, `make qemu` | build one component from source |
-| `make pins` | re-render `build/*/pins.hcl` from the existing lock |
-| `make hashes` | print the component image tags CI looks for |
-| `make print` | print the resolved bake definition |
+| `make` | build the SDK image, the Apptainer image and the image archive |
+| `make sdk` | build the SDK image only |
+| `make toolchain`, `make qemu` | build one component image only |
+| `make print` | print the resolved build definition |
+| `make clean` | delete the Apptainer images, the image archives and the SDK image |
 
-`make hashes` uses the git tree hash of each `build/<component>` directory
-at `HEAD`, so uncommitted changes are not included. CI reuses prebuilt
-component images instead of compiling them; see
-[DEVELOPERS.md](DEVELOPERS.md#ci).
+`make clean` keeps the build cache, which holds most of the disk space.
+The build cache is shared with every other Docker build on the machine.
+`docker buildx prune` deletes all of it, and the next `make` then
+rebuilds everything from source.
 
-Requires `docker buildx` (BuildKit), [mikefarah/yq](https://github.com/mikefarah/yq)
-v4, `curl`, and `apptainer >= 1.3` for the `.sif` target. Ubuntu's apt
-`yq` package is a different tool and does not work here; install yq from
-its [releases](https://github.com/mikefarah/yq/releases).
-
-The component repos are public, so `make lock` and `make sdk` need no
-credentials.
-
-## How pinning works
-
-Two files, ordinary package-manager practice — **intent floats, the lock pins**:
-
-- **`components.yaml`** — hand-edited. May name a moving branch during
-  development.
-- **`sdk.lock.yaml`** — generated by `make lock`. Exact commit SHAs, and
-  the `base_image` tag resolved to a digest from Docker Hub.
-
-`make lock` also renders the lock into one `build/<stage>/pins.hcl` per
-build directory. **The build reads only these `pins.hcl` files**, never
-`components.yaml`. Commit them together with `components.yaml` and
-`sdk.lock.yaml`.
-
-To build from a different commit, branch, or tag of a component, edit its
-`ref:` in `components.yaml` and run `make lock` to re-resolve
-`sdk.lock.yaml` and the pins, then `make sdk` as usual. For example, to
-build against a specific GCC commit:
-
-```yaml
-# components.yaml
-  gcc:
-    repo: https://github.com/Openchip-Software/riscv-ime-gcc.git
-    ref:  deadbeefcafef00d1234567890abcdef12345678   # was: ime-cleanup
-```
-
-Then
-
-```sh
-make lock && make sdk
-```
+To build other component commits than the pinned ones, see
+[Changing a component](DEVELOPERS.md#changing-a-component).
 
 ## Components
 
@@ -112,17 +137,5 @@ make lock && make sdk
 | [`riscv-ime-binutils`](https://github.com/Openchip-Software/riscv-ime-binutils) | binutils/gdb + IME support — cross-built inside ct-ng |
 | [`riscv-ime-qemu`](https://github.com/Openchip-Software/riscv-ime-qemu) | QEMU + IME model |
 
-## Repository layout
-
-```text
-components.yaml          intent — hand-edited
-sdk.lock.yaml            pins — generated, CODEOWNERS-gated
-Makefile                 build entry point
-docker-bake.hcl          build graph: toolchain, qemu, sdk targets
-build/toolchain/         Dockerfile, crosstool-NG defconfig template, pins.hcl
-build/qemu/              Dockerfile, pins.hcl
-build/sdk/               Dockerfile that assembles the image, apptainer def, pins.hcl
-scripts/                 make-lock.sh, check-pins.sh, check-lock.sh
-.github/workflows/       guard (pins and lock checks), sdk (component and SDK images)
-.github/actions/         free-disk, setup-yq
-```
+To change the SDK itself, pin other component commits or make a release,
+see [DEVELOPERS.md](DEVELOPERS.md).

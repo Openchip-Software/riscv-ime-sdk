@@ -4,9 +4,16 @@
 # IME SDK — build entry point. The build graph is docker-bake.hcl; this
 # file passes it the pins rendered from sdk.lock.yaml.
 #
-#   make lock                resolve components.yaml -> sdk.lock.yaml + build/*/pins.hcl
+#   make                     SDK image, Apptainer image and image archive
 #   make sdk                 build the SDK image from source
-#   make toolchain | qemu    build one component from source
+#   make toolchain | qemu    build one component image from source
+#   make clean               delete the Apptainer image, image archive and SDK image
+#
+# Maintainer targets, see DEVELOPERS.md:
+#
+#   make lock                resolve components.yaml -> sdk.lock.yaml + build/*/pins.hcl
+#   make pins                render build/*/pins.hcl from the existing lock
+#   make check               run the guard checks
 #   make hashes              print the component image tags CI looks for
 #
 # CI reuses component images from GHCR; `make sdk` always builds from source.
@@ -26,7 +33,8 @@ REGISTRY    ?= ghcr.io/openchip-software
 # Set IMAGE to use another tag.
 IMAGE       ?= $(REGISTRY)/riscv-ime-sdk:openchip-v$(VERSION)
 
-# Base name of the .sif and .tar.xz files, matching the image tag.
+# Base name of the Apptainer image (.sif) and the image archive (.tar.xz),
+# matching the default SDK image tag.
 DIST        := riscv-ime-sdk-openchip-v$(VERSION)
 
 export REGISTRY
@@ -73,11 +81,17 @@ print:
 	@$(BAKE) --print $(TAG) sdk
 
 $(DIST).sif: sdk build/sdk/sdk.def
-	# --build-arg / %arguments templating needs apptainer >= 1.3.
-	apptainer build --build-arg SDK_VERSION=$(VERSION) $@ build/sdk/sdk.def
+	# --build-arg templating needs apptainer >= 1.3.
+	apptainer build --force --build-arg SDK_IMAGE=$(IMAGE) \
+	    --build-arg SDK_VERSION=$(VERSION) $@ build/sdk/sdk.def
 
 $(DIST).tar.xz: sdk
 	docker save $(IMAGE) | xz -T0 > $@
 
+## Delete what `make` produces: every Apptainer image and image archive in
+## the repo root, and the SDK image tagged IMAGE. BuildKit's
+## build cache is shared with other projects and is kept; `docker buildx
+## prune` deletes it.
 clean:
 	rm -f riscv-ime-sdk-*.sif riscv-ime-sdk-*.tar.xz
+	if docker image inspect $(IMAGE) >/dev/null 2>&1; then docker image rm $(IMAGE); fi
