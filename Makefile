@@ -41,7 +41,7 @@ export REGISTRY
 export LOCK_DIGEST := $(shell sha256sum $(LOCK) | cut -d' ' -f1)
 
 BAKE := docker buildx bake -f docker-bake.hcl $(foreach s,$(COMPONENTS) sdk,-f build/$(s)/pins.hcl)
-TAG  := $(if $(filter command line,$(origin IMAGE)),--set sdk.tags=$(IMAGE))
+TAG  := --set sdk.tags=$(IMAGE)
 
 .PHONY: all sdk $(COMPONENTS) lock pins check hashes print clean
 .DEFAULT_GOAL := all
