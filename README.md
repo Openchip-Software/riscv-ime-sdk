@@ -110,6 +110,15 @@ docker run --rm ghcr.io/openchip-software/riscv-ime-sdk:openchip-v<version> \
     riscv64-openchip-linux-gnu-gcc --version
 ```
 
+Apptainer runs as your user and mounts the current directory and `$HOME`.
+Docker does neither, so to work on files in the current directory, mount
+it and run as your user:
+
+```sh
+docker run --rm -it -u "$(id -u):$(id -g)" -v "$PWD":/work -w /work \
+    ghcr.io/openchip-software/riscv-ime-sdk:openchip-v<version>
+```
+
 ### Make targets
 
 | Target | Does |
