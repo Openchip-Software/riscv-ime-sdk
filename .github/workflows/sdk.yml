@@ -5,7 +5,12 @@
 # from source as separate component images, and only when GHCR does not
 # already hold an image with the same inputs.
 #
-#   resolve ──> component (matrix, only missing images) ──> sdk
+#   guard ──> resolve ──> component (matrix, only missing images) ──> sdk
+#
+# The guard job always runs first: no secrets, no internal hosts, no pins outside the
+# lock, and the lock agrees with the manifest and the pins. `make check`
+# runs the same scripts locally. Nothing is built or pushed from inputs
+# that fail it.
 #
 # The toolchain and qemu images are tagged with the git tree hash of
 # build/<component>, which contains every input of the image: Dockerfile,
@@ -88,7 +93,22 @@ env:
   DOCKER_BUILD_SUMMARY:       false
 
 jobs:
+  guard:
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-yq
+      - name: No secrets, no internal hosts, no pins outside the lock
+        run: ./scripts/check-pins.sh
+      # Runs after a check-pins failure too, so that one run reports both.
+      - name: components.yaml, sdk.lock.yaml and build/*/pins.hcl agree
+        if: ${{ !cancelled() }}
+        run: ./scripts/check-lock.sh
+
   resolve:
+    needs: guard
     runs-on: ubuntu-26.04
     outputs:
       build:          ${{ steps.r.outputs.build }}
