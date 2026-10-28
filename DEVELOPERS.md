@@ -108,7 +108,7 @@ To build the SDK from another commit, branch or tag of a component repo:
    `.github/`, never in a Dockerfile or `docker-bake.hcl`. Then it runs
    [`scripts/check-lock.sh`](scripts/check-lock.sh), which checks that
    `components.yaml`, `sdk.lock.yaml` and `build/*/pins.hcl` agree. The
-   `guard` workflow runs both scripts.
+   `guard` job of the `sdk` workflow runs both scripts.
 
 5. **Build and test it locally:** `make`, then the checks in
    [Check the build](README.md#check-the-build).
@@ -118,7 +118,7 @@ To build the SDK from another commit, branch or tag of a component repo:
    matching `commit:` and `resolved_from:` lines in the lock, and the
    matching `*_COMMIT` line in one `pins.hcl`. That makes it easy to
    review, and easy to find with `git bisect` if the new commit turns
-   out to be bad. The `guard` workflow fails if the `pins.hcl` files
+   out to be bad. The `guard` job fails if the `pins.hcl` files
    differ from what the lock renders. All three files are listed in
    [`CODEOWNERS`](.github/CODEOWNERS), so the PR needs approval from a
    named reviewer.
@@ -139,13 +139,16 @@ build/toolchain/         Dockerfile, crosstool-NG defconfig template, pins.hcl
 build/qemu/              Dockerfile, pins.hcl
 build/sdk/               Dockerfile of the SDK image, Apptainer definition, pins.hcl
 scripts/                 make-lock.sh, check-pins.sh, check-lock.sh
-.github/workflows/       guard (pins and lock checks), sdk (component and SDK images)
+.github/workflows/       sdk (pins and lock checks, component and SDK images)
 .github/actions/         free-disk, setup-yq
 ```
 
 ## CI
 
-The `sdk` workflow runs three jobs: `resolve`, `component` and `sdk`.
+The `sdk` workflow runs four jobs: `guard`, `resolve`, `component` and
+`sdk`. `guard` runs the checks of `make check` on every trigger, and the
+other jobs wait for it, so nothing is built or pushed from pins it
+rejects.
 
 ### Component images
 
@@ -218,7 +221,7 @@ Every image carries `sdk_version` from `sdk.lock.yaml` in its
 
 `sdk_version` in `components.yaml` is the only hand-edited copy of the
 SDK version. `make lock` copies it into `sdk.lock.yaml` and
-`build/sdk/pins.hcl`, and the `guard` workflow fails if either differs.
+`build/sdk/pins.hcl`, and the `guard` job fails if either differs.
 `make` passes it to `apptainer build` for the Apptainer image.
 
 1. Set `sdk_version` in `components.yaml` to the release date,

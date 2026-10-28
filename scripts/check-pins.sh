@@ -15,7 +15,7 @@ note() { printf '  %s\n' "$*"; }
 bad()  { printf 'FAIL: %s\n' "$*"; fail=1; }
 
 # Files permitted to name a component repo. build/*/pins.hcl are rendered
-# from the lock by `make lock`, and guard.yml fails when they differ from
+# from the lock by `make lock`, and the guard job fails when they differ from
 # it. Everything else must receive repo URLs as build args from the pins.
 PIN_ALLOWLIST='^(components\.yaml|sdk\.lock\.yaml|build/[^/]+/pins\.hcl|README\.md|scripts/check-pins\.sh|\.github/)'
 
