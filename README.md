@@ -53,7 +53,7 @@ from source, at the component commits pinned in `sdk.lock.yaml`.
 
 - Docker with BuildKit and the `buildx` plugin. Check with
   `docker buildx version`.
-- Apptainer 1.3 or later. It reads the SDK image from the local Docker
+- Apptainer. It reads the SDK image from the local Docker
   daemon, so the user running `make` needs access to Docker.
 - [mikefarah/yq](https://github.com/mikefarah/yq) v4. Ubuntu's apt `yq`
   package is a different tool and does not work here; install yq from its
