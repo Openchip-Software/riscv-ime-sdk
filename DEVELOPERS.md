@@ -79,7 +79,7 @@ To build the SDK from another commit, branch or tag of a component repo:
    A moving branch name is fine during development. Once the change is
    settled, pin a tag or an exact SHA, so that `components.yaml` records
    what you meant to build and not whatever was at the branch head that
-   day. A release requires it; see [Releasing](#releasing).
+   day. A release requires a tag; see [Releasing](#releasing).
 
    To tag a component commit, see
    [Tagging a component commit](#tagging-a-component-commit).
@@ -236,8 +236,8 @@ SDK version. `make lock` copies it into `sdk.lock.yaml` and
 `build/sdk/pins.hcl`, and the `guard` job fails if either differs.
 
 1. Set `sdk_version` in `components.yaml` to the release date,
-   `YYYY.MM.DD`. Every component `ref:` must be a tag or a commit, not
-   a branch, and `base_image` must be pinned by digest. On a release
+   `YYYY.MM.DD`. Every component `ref:` must be a tag, not a branch or
+   a commit, and `base_image` must be pinned by digest. On a release
    tag the `guard` job runs `scripts/check-lock.sh --release`, which
    fails otherwise; run it locally first.
 2. Run `make lock`, and commit `components.yaml`, `sdk.lock.yaml` and

@@ -104,8 +104,8 @@ jobs:
       - name: No secrets, no internal hosts, no pins outside the lock
         run: ./scripts/check-pins.sh
       # Runs after a check-pins failure too, so that one run reports both.
-      # A release tag also requires every component pinned by a tag or a
-      # commit, and the base image by a digest.
+      # A release tag also requires every component pinned by a tag, and
+      # the base image by a digest.
       - name: components.yaml, sdk.lock.yaml and build/*/pins.hcl agree
         if: ${{ !cancelled() }}
         run: ./scripts/check-lock.sh ${{ github.event_name == 'push' && github.ref_type == 'tag' && '--release' || '' }}

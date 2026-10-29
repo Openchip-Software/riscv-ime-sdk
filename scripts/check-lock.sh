@@ -9,8 +9,8 @@
 # running it. Run in CI on every PR, and by `make check`.
 #
 #   check-lock.sh            the three files agree
-#   check-lock.sh --release  and every component is pinned by a tag or a
-#                            commit, not a branch. Run in CI on a release tag.
+#   check-lock.sh --release  and every component is pinned by a tag, not a
+#                            branch or a commit. Run in CI on a release tag.
 
 set -uo pipefail
 
@@ -61,9 +61,10 @@ for c in $(yq -r '.components | keys | .[]' "$MANIFEST"); do
         *)  bad "$c: resolved_kind '$kind' is not branch, tag or commit — run 'make lock'" ;;
     esac
     # A release must be rebuildable from components.yaml alone. A branch has
-    # moved on by then.
-    if [[ "$release" == true && "$kind" == branch ]]; then
-        bad "$c: a release must pin a tag or a commit, not the branch '$(yq -r ".components.\"$c\".ref" "$MANIFEST")'"
+    # moved on by then, and a commit on no branch or tag may not stay
+    # fetchable. A tag keeps it reachable.
+    if [[ "$release" == true && "$kind" != tag ]]; then
+        bad "$c: a release must pin a tag, not the $kind '$(yq -r ".components.\"$c\".ref" "$MANIFEST")'"
     fi
 done
 same base_image "$(yq -r '.base_image' "$MANIFEST")" \
