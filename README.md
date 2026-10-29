@@ -53,7 +53,7 @@ from source, at the component commits pinned in `sdk.lock.yaml`.
 
 - Docker with BuildKit and the `buildx` plugin. Check with
   `docker buildx version`.
-- Apptainer 1.3 or later. It reads the SDK image from the local Docker
+- Apptainer. It reads the SDK image from the local Docker
   daemon, so the user running `make` needs access to Docker.
 - [mikefarah/yq](https://github.com/mikefarah/yq) v4. Ubuntu's apt `yq`
   package is a different tool and does not work here; install yq from its
@@ -108,6 +108,15 @@ It prints `hello`. To check the SDK image directly:
 ```sh
 docker run --rm ghcr.io/openchip-software/riscv-ime-sdk:openchip-v<version> \
     riscv64-openchip-linux-gnu-gcc --version
+```
+
+Apptainer runs as your user and mounts the current directory and `$HOME`.
+Docker does neither, so to work on files in the current directory, mount
+it and run as your user:
+
+```sh
+docker run --rm -it -u "$(id -u):$(id -g)" -v "$PWD":/work -w /work \
+    ghcr.io/openchip-software/riscv-ime-sdk:openchip-v<version>
 ```
 
 ### Make targets

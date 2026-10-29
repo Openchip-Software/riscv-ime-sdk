@@ -58,9 +58,8 @@ target "qemu" {
   }
 }
 
-# The tag of a local build: the name a release of this sdk_version gets in
-# GHCR, and the one build/sdk/sdk.def expects. CI sets its own tag with
-# --set sdk.tags.
+# The default tag: the name a release of this sdk_version gets in GHCR.
+# `make` and CI set the tag with --set sdk.tags.
 target "sdk-tag" {
   tags = ["${REGISTRY}/riscv-ime-sdk:openchip-v${SDK_VERSION}"]
 }

@@ -41,7 +41,7 @@ export REGISTRY
 export LOCK_DIGEST := $(shell sha256sum $(LOCK) | cut -d' ' -f1)
 
 BAKE := docker buildx bake -f docker-bake.hcl $(foreach s,$(COMPONENTS) sdk,-f build/$(s)/pins.hcl)
-TAG  := $(if $(filter command line,$(origin IMAGE)),--set sdk.tags=$(IMAGE))
+TAG  := --set sdk.tags=$(IMAGE)
 
 .PHONY: all sdk $(COMPONENTS) lock pins check hashes print clean
 .DEFAULT_GOAL := all
@@ -80,10 +80,10 @@ hashes:
 print:
 	@$(BAKE) --print $(TAG) sdk
 
-$(DIST).sif: sdk build/sdk/sdk.def
-	# --build-arg templating needs apptainer >= 1.3.
-	apptainer build --force --build-arg SDK_IMAGE=$(IMAGE) \
-	    --build-arg SDK_VERSION=$(VERSION) $@ build/sdk/sdk.def
+# The same conversion as `apptainer pull docker://...` of a published image:
+# the environment and labels of the SDK image carry over.
+$(DIST).sif: sdk
+	apptainer build --force $@ docker-daemon:$(IMAGE)
 
 $(DIST).tar.xz: sdk
 	docker save $(IMAGE) | xz -T0 > $@

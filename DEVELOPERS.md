@@ -137,7 +137,7 @@ Makefile                 build entry point
 docker-bake.hcl          build graph: toolchain, qemu, sdk targets
 build/toolchain/         Dockerfile, crosstool-NG defconfig template, pins.hcl
 build/qemu/              Dockerfile, pins.hcl
-build/sdk/               Dockerfile of the SDK image, Apptainer definition, pins.hcl
+build/sdk/               Dockerfile of the SDK image, pins.hcl
 scripts/                 make-lock.sh, check-pins.sh, check-lock.sh
 .github/workflows/       sdk (pins and lock checks, component and SDK images)
 .github/actions/         free-disk, setup-yq
@@ -222,7 +222,6 @@ Every image carries `sdk_version` from `sdk.lock.yaml` in its
 `sdk_version` in `components.yaml` is the only hand-edited copy of the
 SDK version. `make lock` copies it into `sdk.lock.yaml` and
 `build/sdk/pins.hcl`, and the `guard` job fails if either differs.
-`make` passes it to `apptainer build` for the Apptainer image.
 
 1. Set `sdk_version` in `components.yaml` to the release date,
    `YYYY.MM.DD`.

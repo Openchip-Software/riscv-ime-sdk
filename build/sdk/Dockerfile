@@ -28,6 +28,15 @@ RUN apt-get update \
 COPY --link --from=toolchain /opt/openchip/toolchain /opt/openchip/toolchain
 COPY --link --from=qemu      /opt/openchip/qemu      /opt/openchip/qemu
 
+# `apptainer run-help` prints this file. It survives the conversion to .sif,
+# local or by `apptainer pull docker://...`.
+COPY --link <<EOF /.singularity.d/runscript.help
+    Container with toolchains, sysroot and emulators for IME Option G development.
+    This installation is based on Ubuntu 26.04.
+
+    Sources and build recipe: https://github.com/Openchip-Software/riscv-ime-sdk
+EOF
+
 ENV RISCV_SYSROOT=/opt/openchip/toolchain/riscv64-openchip-linux-gnu/sysroot
 ENV QEMU_LD_PREFIX=/opt/openchip/toolchain/riscv64-openchip-linux-gnu/sysroot
 ENV QEMU_CPU=max,x-zvvm=true,vlen=2048
