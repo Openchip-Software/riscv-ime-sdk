@@ -5,7 +5,7 @@ SPDX-License-Identifier: Apache-2.0
 
 # IME SDK
 
-This is Openchip's cross toolchain, sysroot and emulator for **RISC-V IME**
+This is Openchip's cross toolchain, sysroot and emulators for **RISC-V IME**
 development. It ships as an OCI image, the **SDK image**, and as an
 **Apptainer image** (`.sif`) converted from it.
 
@@ -36,8 +36,9 @@ The SDK image provides:
 | --- | --- |
 | `/opt/openchip/toolchain` | gcc, binutils, gdb, glibc sysroot — `riscv64-openchip-linux-gnu-*` |
 | `/opt/openchip/qemu` | `qemu-riscv64`, `qemu-system-riscv64`, `qemu-system-riscv32` |
+| `/opt/openchip/sail` | `sail_riscv_sim`, the Sail RISC-V model; sample configurations in `share/sail-riscv/config` |
 
-Both directories are on `PATH`. `QEMU_LD_PREFIX` points at the sysroot,
+The `bin` directories of all three are on `PATH`. `QEMU_LD_PREFIX` points at the sysroot,
 so `qemu-riscv64 ./prog` runs a dynamically linked program without `-L`.
 `QEMU_CPU` sets the default CPU model to `max,x-zvvm=true,vlen=2048`.
 
@@ -125,7 +126,7 @@ docker run --rm -it -u "$(id -u):$(id -g)" -v "$PWD":/work -w /work \
 | --- | --- |
 | `make` | build the SDK image, the Apptainer image and the image archive |
 | `make sdk` | build the SDK image only |
-| `make toolchain`, `make qemu` | build one component image only |
+| `make toolchain`, `make qemu`, `make sail` | build one component image only |
 | `make print` | print the resolved build definition |
 | `make clean` | delete the Apptainer images, the image archives and the SDK image |
 
@@ -145,6 +146,7 @@ To build other component commits than the pinned ones, see
 | [`riscv-ime-gcc`](https://github.com/Openchip-Software/riscv-ime-gcc) | GCC + IME support — cross-built inside ct-ng |
 | [`riscv-ime-binutils`](https://github.com/Openchip-Software/riscv-ime-binutils) | binutils/gdb + IME support — cross-built inside ct-ng |
 | [`riscv-ime-qemu`](https://github.com/Openchip-Software/riscv-ime-qemu) | QEMU + IME model |
+| [`sail-riscv`](https://github.com/Openchip-Software/sail-riscv) | Sail RISC-V model + IME support |
 
 To change the SDK itself, pin other component commits or make a release,
 see [DEVELOPERS.md](DEVELOPERS.md).

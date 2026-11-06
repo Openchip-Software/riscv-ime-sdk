@@ -5,17 +5,19 @@
 #
 #   toolchain   build/toolchain   crosstool-NG toolchain, hours
 #   qemu        build/qemu        QEMU, minutes
-#   sdk         build/sdk         final image; takes toolchain and qemu as
-#                                 named contexts
+#   sail        build/sail        Sail RISC-V model, minutes
+#   sdk         build/sdk         final image; takes toolchain, qemu and
+#                                 sail as named contexts
 #
 # The build args of each target come from build/<target>/pins.hcl, which
 # `make lock` renders from sdk.lock.yaml. Bake reads only docker-bake.hcl
 # by default, so pass the pin files as well:
 #
 #   docker buildx bake -f docker-bake.hcl \
-#     -f build/toolchain/pins.hcl -f build/qemu/pins.hcl -f build/sdk/pins.hcl sdk
+#     -f build/toolchain/pins.hcl -f build/qemu/pins.hcl -f build/sail/pins.hcl \
+#     -f build/sdk/pins.hcl sdk
 #
-# `make sdk` does this. With no overrides, `sdk` builds both components
+# `make sdk` does this. With no overrides, `sdk` builds every component
 # from source. To use prebuilt component images instead, override the
 # contexts:
 #
@@ -58,6 +60,15 @@ target "qemu" {
   }
 }
 
+target "sail" {
+  inherits = ["_component", "sail-pins"]
+  context  = "build/sail"
+  target   = "sail"
+  labels = {
+    "org.opencontainers.image.description" = "IME SDK component: Sail RISC-V model with the IME extension"
+  }
+}
+
 # The default tag: the name a release of this sdk_version gets in GHCR.
 # `make` and CI set the tag with --set sdk.tags.
 target "sdk-tag" {
@@ -71,12 +82,13 @@ target "sdk" {
   contexts = {
     toolchain = "target:toolchain"
     qemu      = "target:qemu"
+    sail      = "target:sail"
   }
   args = {
     LOCK_DIGEST = LOCK_DIGEST
   }
   labels = {
     "org.opencontainers.image.source"      = "https://github.com/Openchip-Software/riscv-ime-sdk"
-    "org.opencontainers.image.description" = "IME SDK: riscv64 cross toolchain, sysroot and QEMU"
+    "org.opencontainers.image.description" = "IME SDK: riscv64 cross toolchain, sysroot, QEMU and the Sail RISC-V model"
   }
 }

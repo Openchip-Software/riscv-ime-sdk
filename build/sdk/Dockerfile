@@ -4,10 +4,10 @@
 #
 # IME SDK image: assembly only.
 #
-# `toolchain` and `qemu` are not stages of this file. They are named build
-# contexts supplied by docker-bake.hcl: either the bake targets that build
-# them from source, or the prebuilt component images from GHCR. Build with
-# `make sdk` or `docker buildx bake`, not with `docker build`.
+# `toolchain`, `qemu` and `sail` are not stages of this file. They are
+# named build contexts supplied by docker-bake.hcl: either the bake targets
+# that build them from source, or the prebuilt component images from GHCR.
+# Build with `make sdk` or `docker buildx bake`, not with `docker build`.
 
 # pins.hcl sets the digest-pinned base image. The default is a placeholder
 # that satisfies the Dockerfile linter: a build without pins.hcl starts
@@ -22,11 +22,12 @@ ENV TZ=Etc/UTC
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-                    libpython3.14 libglib2.0-0 libpixman-1-0 libstdc++6 \
+                    libpython3.14 libglib2.0-0 libpixman-1-0 libstdc++6 libgmp10 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --link --from=toolchain /opt/openchip/toolchain /opt/openchip/toolchain
 COPY --link --from=qemu      /opt/openchip/qemu      /opt/openchip/qemu
+COPY --link --from=sail      /opt/openchip/sail      /opt/openchip/sail
 
 # `apptainer run-help` prints this file. It survives the conversion to .sif,
 # local or by `apptainer pull docker://...`.
@@ -40,7 +41,7 @@ EOF
 ENV RISCV_SYSROOT=/opt/openchip/toolchain/riscv64-openchip-linux-gnu/sysroot
 ENV QEMU_LD_PREFIX=/opt/openchip/toolchain/riscv64-openchip-linux-gnu/sysroot
 ENV QEMU_CPU=max,x-zvvm=true,vlen=2048
-ENV PATH=/opt/openchip/toolchain/bin:/opt/openchip/qemu/bin:$PATH
+ENV PATH=/opt/openchip/toolchain/bin:/opt/openchip/qemu/bin:/opt/openchip/sail/bin:$PATH
 
 ARG SDK_VERSION
 ARG LOCK_DIGEST

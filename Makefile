@@ -6,7 +6,8 @@
 #
 #   make                     SDK image, Apptainer image and image archive
 #   make sdk                 build the SDK image from source
-#   make toolchain | qemu    build one component image from source
+#   make toolchain | qemu | sail
+#                            build one component image from source
 #   make clean               delete the Apptainer image, image archive and SDK image
 #
 # Maintainer targets, see DEVELOPERS.md:
@@ -25,7 +26,7 @@
 
 LOCK        := sdk.lock.yaml
 YQ          := yq
-COMPONENTS  := toolchain qemu
+COMPONENTS  := toolchain qemu sail
 
 VERSION     := $(shell $(YQ) -r '.sdk_version' $(LOCK))
 REGISTRY    ?= ghcr.io/openchip-software
