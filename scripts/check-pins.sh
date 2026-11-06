@@ -52,8 +52,8 @@ fi
 
 echo "==> component refs live only in the lock"
 # ime-sdk is this repo — its own OCI source label and def-file URL are not
-# component pins. Only the four component repos must live in the lock.
-hits=$(git grep -nIiE 'github\.com/Openchip-Software/riscv-ime-(crosstool-NG|gcc|binutils|qemu)' -- . \
+# component pins. Only the component repos must live in the lock.
+hits=$(git grep -nIiE 'github\.com/Openchip-Software/(riscv-ime-(crosstool-NG|gcc|binutils|qemu)|sail-riscv)' -- . \
        | grep -vE "$PIN_ALLOWLIST" || true)
 if [[ -n "$hits" ]]; then
     printf '%s\n' "$hits"

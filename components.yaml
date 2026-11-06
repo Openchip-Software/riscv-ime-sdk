@@ -30,6 +30,9 @@ components:
   qemu:
     repo: https://github.com/Openchip-Software/riscv-ime-qemu.git
     ref:  openchip/releases/20261104
+  sail-riscv:
+    repo: https://github.com/Openchip-Software/sail-riscv.git
+    ref:  openchip/releases/20261106
 
 # Build stages, not repos. Each stage is a directory under build/, and
 # `make lock` writes the pins of the components it lists to
@@ -39,4 +42,5 @@ components:
 stages:
   toolchain: [crosstools-ng, binutils-gdb, gcc]
   qemu:      [qemu]
+  sail:      [sail-riscv]
   sdk:       []

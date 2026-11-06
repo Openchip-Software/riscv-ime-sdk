@@ -1,9 +1,9 @@
 # SPDX-FileCopyrightText: 2026 Openchip and Software Technologies, S.L.
 # SPDX-License-Identifier: Apache-2.0
 
-# Builds the IME SDK image. The crosstool-NG toolchain and qemu are built
-# from source as separate component images, and only when GHCR does not
-# already hold an image with the same inputs.
+# Builds the IME SDK image. The crosstool-NG toolchain, qemu and the Sail
+# RISC-V model are built from source as separate component images, and only
+# when GHCR does not already hold an image with the same inputs.
 #
 #   guard ──> resolve ──> component (matrix, only missing images) ──> sdk
 #
@@ -13,7 +13,7 @@
 # `make check-refs` run the same scripts locally. Nothing is built or pushed from inputs
 # that fail it.
 #
-# The toolchain and qemu images are tagged with the git tree hash of
+# The toolchain, qemu and sail images are tagged with the git tree hash of
 # build/<component>, which contains every input of the image: Dockerfile,
 # configuration and pins. The tag is a function of the inputs, not of the
 # branch, so a component built on a feature branch is reused by main after
@@ -44,7 +44,7 @@
 # To publish a test image from any branch, run this workflow from the
 # Actions tab on that branch with "publish" checked. It never moves :latest.
 #
-# A manual run with from-scratch rebuilds both components with no cache
+# A manual run with from-scratch rebuilds every component with no cache
 # under separate -verify-<run> tags. This catches builds that no longer
 # reproduce. These runs never push the SDK image.
 #
@@ -87,6 +87,7 @@ env:
     docker-bake.hcl
     build/toolchain/pins.hcl
     build/qemu/pins.hcl
+    build/sail/pins.hcl
     build/sdk/pins.hcl
   # The sdk job writes its own summary of the images. The build record
   # artifact and the bake-action summary repeat the build log.
@@ -122,6 +123,8 @@ jobs:
       toolchain-tree: ${{ steps.r.outputs.toolchain-tree }}
       qemu:           ${{ steps.r.outputs.qemu }}
       qemu-tree:      ${{ steps.r.outputs.qemu-tree }}
+      sail:           ${{ steps.r.outputs.sail }}
+      sail-tree:      ${{ steps.r.outputs.sail-tree }}
       from-scratch:   ${{ steps.r.outputs.from-scratch }}
     steps:
       # On a pull request this is the merge commit: the trees that would land.
@@ -164,7 +167,7 @@ jobs:
         run: |
           set -euo pipefail
           build='[]'
-          for c in toolchain qemu; do
+          for c in toolchain qemu sail; do
             tree=$(git rev-parse "HEAD:build/$c")
             ref="$REGISTRY/riscv-ime-sdk-$c:$tree"
             if [ "$FROM_SCRATCH" = true ]; then
@@ -330,10 +333,11 @@ jobs:
         id: c
         run: |
           set -euo pipefail
-          for c in toolchain qemu; do
+          for c in toolchain qemu sail; do
             case $c in
               toolchain) ref='${{ needs.resolve.outputs.toolchain }}' ;;
               qemu)      ref='${{ needs.resolve.outputs.qemu }}' ;;
+              sail)      ref='${{ needs.resolve.outputs.sail }}' ;;
             esac
             digest=$(docker buildx imagetools inspect "$ref" --format '{{json .Manifest}}' | jq -r .digest)
             pinned="${ref%:*}@${digest}"
@@ -360,8 +364,10 @@ jobs:
             sdk.labels.org.opencontainers.image.revision=${{ github.sha }}
             sdk.labels.eu.openchip.ime.toolchain=${{ steps.c.outputs.toolchain }}
             sdk.labels.eu.openchip.ime.qemu=${{ steps.c.outputs.qemu }}
+            sdk.labels.eu.openchip.ime.sail=${{ steps.c.outputs.sail }}
             sdk.contexts.toolchain=docker-image://${{ steps.c.outputs.toolchain }}
             sdk.contexts.qemu=docker-image://${{ steps.c.outputs.qemu }}
+            sdk.contexts.sail=docker-image://${{ steps.c.outputs.sail }}
             ${{ steps.v.outputs.publish != 'true' && 'sdk.output=type=cacheonly' || '' }}
 
       - name: Output the pushed image by digest
@@ -406,6 +412,7 @@ jobs:
           FROM_SCRATCH: ${{ needs.resolve.outputs.from-scratch }}
           TOOLCHAIN:    ${{ steps.c.outputs.toolchain || needs.resolve.outputs.toolchain }}
           QEMU:         ${{ steps.c.outputs.qemu || needs.resolve.outputs.qemu }}
+          SAIL:         ${{ steps.c.outputs.sail || needs.resolve.outputs.sail }}
           IMAGE:        ${{ steps.v.outputs.image }}
           PUSHED:       ${{ steps.push.outputs.image }}
           ASSEMBLY:     ${{ steps.bake.outcome }}
@@ -416,8 +423,8 @@ jobs:
           {
             echo '| image | reference | status |'
             echo '| --- | --- | --- |'
-            for c in toolchain qemu; do
-              case $c in toolchain) ref=$TOOLCHAIN ;; qemu) ref=$QEMU ;; esac
+            for c in toolchain qemu sail; do
+              case $c in toolchain) ref=$TOOLCHAIN ;; qemu) ref=$QEMU ;; sail) ref=$SAIL ;; esac
               if ! jq -e --arg c "$c" 'index($c)' <<< "$BUILD" >/dev/null; then
                 status=reused
               elif [ "$FROM_SCRATCH" = true ]; then
