@@ -12,7 +12,7 @@
 #   the lock pins  ->  sdk.lock.yaml
 
 schema: 2
-sdk_version: "2026.10.14"
+sdk_version: "2026.11.06"
 
 # Base image of every build stage, pinned by digest
 base_image: ubuntu:26.04@sha256:f144425ff09be612d6d9ad965196e9cdc23dae1f42110a8a11a3e9a8198759f7
@@ -23,13 +23,13 @@ components:
     ref:  openchip/releases/20260414
   binutils-gdb:
     repo: https://github.com/Openchip-Software/riscv-ime-binutils.git
-    ref:  openchip/releases/20260504
+    ref:  openchip/releases/20261103
   gcc:
     repo: https://github.com/Openchip-Software/riscv-ime-gcc.git
-    ref:  openchip/releases/20260706
+    ref:  openchip/releases/20261104
   qemu:
     repo: https://github.com/Openchip-Software/riscv-ime-qemu.git
-    ref:  openchip/releases/20260628
+    ref:  openchip/releases/20261104
 
 # Build stages, not repos. Each stage is a directory under build/, and
 # `make lock` writes the pins of the components it lists to

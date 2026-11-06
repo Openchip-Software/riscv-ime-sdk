@@ -8,8 +8,8 @@ target "toolchain-pins" {
     CROSSTOOLS_NG_REPO   = "https://github.com/Openchip-Software/riscv-ime-crosstool-NG.git"
     CROSSTOOLS_NG_COMMIT = "d09209b5ff58b9327e694acdd381b2bcdb7d676a"
     BINUTILS_GDB_REPO    = "https://github.com/Openchip-Software/riscv-ime-binutils.git"
-    BINUTILS_GDB_COMMIT  = "b4498249fad62bb3f38f43786e6b85e5a98107c9"
+    BINUTILS_GDB_COMMIT  = "192b75e22637f25ecd0cc6c7d6cee81699effba6"
     GCC_REPO             = "https://github.com/Openchip-Software/riscv-ime-gcc.git"
-    GCC_COMMIT           = "f3ac260eca8fe4ccdea4bd74025063ec1a012b01"
+    GCC_COMMIT           = "ba4a0d0a3fd87d83f198f45bb93e83018f92f251"
   }
 }
