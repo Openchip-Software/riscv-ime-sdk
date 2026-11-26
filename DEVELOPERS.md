@@ -160,7 +160,7 @@ scripts/                 make-lock.sh, resolve.sh, check-pins.sh, check-lock.sh,
 ## CI
 
 The `sdk` workflow runs five jobs: `guard`, `resolve`, `component`,
-`sdk` and `test-llama`. `guard` runs the checks of `make check` and
+`test-llama` and `sdk`. `guard` runs the checks of `make check` and
 `make check-refs` on every trigger, and the other jobs wait for it, so
 nothing is built or pushed from pins it rejects.
 
@@ -241,11 +241,11 @@ script runs every SDK tool in the SDK image: the Apptainer image
 `SDK_SIF` when it is set, else the Docker image `SDK_IMAGE`. Its work
 directory is `out/test-<name>`, which git ignores.
 
-The `sdk` job builds the SDK image but does not load it. Each test job
-therefore assembles the same image again from the component images that
-the `sdk` job pinned by digest, and loads it into Docker. A test job runs
-only when the `sdk` job succeeded. A failed test does not stop a release:
-the `sdk` job pushes the image before the tests run.
+The test job runs before the `sdk` job. It pins the component images by
+digest, assembles the SDK image from them and loads it into Docker. The
+`sdk` job runs only when the test passed, and it assembles the SDK image
+from the same digests. A failed test therefore stops every run before
+the `sdk` job, and a release run pushes nothing.
 
 `test-llama` builds llama.cpp with the Zvvm kernels, branch `riscv-zvvm`
 of `gitlab.com/vrull-public/llama.cpp`, at the commit pinned in
