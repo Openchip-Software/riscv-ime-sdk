@@ -151,17 +151,18 @@ build/toolchain/         Dockerfile, crosstool-NG defconfig template, pins.hcl
 build/qemu/              Dockerfile, pins.hcl
 build/sail/              Dockerfile, pins.hcl
 build/sdk/               Dockerfile of the SDK image, pins.hcl
-scripts/                 make-lock.sh, resolve.sh, check-pins.sh, check-lock.sh, check-refs.sh
-.github/workflows/       sdk (pins and lock checks, component and SDK images)
+scripts/                 make-lock.sh, resolve.sh, check-pins.sh, check-lock.sh, check-refs.sh,
+                         test-llama.sh
+.github/workflows/       sdk (pins and lock checks, component and SDK images, tests)
 .github/actions/         free-disk, setup-yq
 ```
 
 ## CI
 
-The `sdk` workflow runs four jobs: `guard`, `resolve`, `component` and
-`sdk`. `guard` runs the checks of `make check` and `make check-refs` on
-every trigger, and the other jobs wait for it, so nothing is built or
-pushed from pins it rejects.
+The `sdk` workflow runs five jobs: `guard`, `resolve`, `component`,
+`sdk` and `test-llama`. `guard` runs the checks of `make check` and
+`make check-refs` on every trigger, and the other jobs wait for it, so
+nothing is built or pushed from pins it rejects.
 
 ### Component images
 
@@ -231,6 +232,30 @@ of an older release never moves `:latest` back.
 
 Every image carries `sdk_version` from `sdk.lock.yaml` in its
 `org.opencontainers.image.version` label, whatever its tag.
+
+### Tests
+
+Each test is one script, `scripts/test-<name>.sh`. `make test-<name>`
+runs it locally, and the CI job `test-<name>` runs the same script. The
+script runs every SDK tool in the SDK image: the Apptainer image
+`SDK_SIF` when it is set, else the Docker image `SDK_IMAGE`. Its work
+directory is `out/test-<name>`, which git ignores.
+
+The `sdk` job builds the SDK image but does not load it. Each test job
+therefore assembles the same image again from the component images that
+the `sdk` job pinned by digest, and loads it into Docker. A test job runs
+only when the `sdk` job succeeded. A failed test does not stop a release:
+the `sdk` job pushes the image before the tests run.
+
+`test-llama` builds llama.cpp with the Zvvm kernels, branch `riscv-zvvm`
+of `gitlab.com/vrull-public/llama.cpp`, at the commit pinned in
+`scripts/test-llama.sh`. It runs two LFM2-350M models, one with Q4_0
+weights and one with F16 weights, at VLEN 512 and 2048 under
+`qemu-riscv64`. It fails unless the Zvvm counters show that the Q4_0
+GEMM, the F16 GEMM and the flash-attention kernels ran. The script also
+pins the CMake and Ninja releases and the models by sha256, because the
+SDK image has no CMake or Ninja. The job caches these downloads. To test
+another llama.cpp commit or branch, set `LLAMA_REF`.
 
 ### Releasing
 

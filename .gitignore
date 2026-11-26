@@ -14,3 +14,6 @@ api_access_token
 *.tar.xz
 *.tar.zst
 sha256sums.txt
+
+# Test work directories: scripts/test-*.sh
+/out/

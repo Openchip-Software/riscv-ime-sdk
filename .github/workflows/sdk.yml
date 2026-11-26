@@ -5,7 +5,7 @@
 # RISC-V model are built from source as separate component images, and only
 # when GHCR does not already hold an image with the same inputs.
 #
-#   guard ──> resolve ──> component (matrix, only missing images) ──> sdk
+#   guard ──> resolve ──> component (matrix, only missing images) ──> sdk ──> test-llama
 #
 # The guard job always runs first: no secrets, no internal hosts, no pins outside the
 # lock, the lock agrees with the manifest and the pins, and no tag in a
@@ -47,6 +47,10 @@
 # A manual run with from-scratch rebuilds every component with no cache
 # under separate -verify-<run> tags. This catches builds that no longer
 # reproduce. These runs never push the SDK image.
+#
+# The test-llama job builds llama.cpp with the Zvvm kernels with the SDK
+# toolchain and runs it on the SDK's QEMU. It runs scripts/test-llama.sh,
+# which `make test-llama` runs locally.
 #
 # The apptainer publish job is disabled for now.
 #
@@ -278,6 +282,12 @@ jobs:
           || (needs.component.result == 'skipped' && needs.resolve.outputs.build == '[]'))
     runs-on: ubuntu-26.04
     timeout-minutes: 30
+    # The component images pinned by digest. The test jobs assemble the
+    # same SDK image from them.
+    outputs:
+      toolchain: ${{ steps.c.outputs.toolchain }}
+      qemu:      ${{ steps.c.outputs.qemu }}
+      sail:      ${{ steps.c.outputs.sail }}
     # A newer push to a feature branch supersedes the running assembly.
     # Runs on main are not cancelled, so that every merged commit gets a
     # finished build. Runs on a release tag are not cancelled because they
@@ -449,3 +459,65 @@ jobs:
               row sdk "$IMAGE" "built, not pushed: $why"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
+
+  # Tests the SDK image: scripts/test-llama.sh, the same script that
+  # `make test-llama` runs. The sdk job does not load its image, so this
+  # job assembles the same image again from the component images that the
+  # sdk job pinned by digest. The assembly takes minutes.
+  test-llama:
+    needs: sdk
+    if: ${{ !cancelled() && needs.sdk.result == 'success' }}
+    runs-on: ubuntu-26.04
+    # The build and the four runs on QEMU take about 15 minutes on 4 CPUs.
+    timeout-minutes: 60
+    concurrency:
+      group: test-llama-${{ github.ref }}${{ inputs.from-scratch == true && '-verify' || '' }}
+      cancel-in-progress: ${{ github.ref != 'refs/heads/main' && github.ref_type != 'tag' }}
+    permissions:
+      contents: read
+      packages: read
+    env:
+      SDK_IMAGE:  riscv-ime-sdk:test
+      TEST_DIR:   out/test-llama
+      TEST_CACHE: out/test-cache
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/free-disk
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Assemble and load the SDK image
+        uses: docker/bake-action@018cb6412ab401ebaa809aa5f85966b74628600f # v7.4.0
+        with:
+          source: .
+          files: ${{ env.BAKE_FILES }}
+          targets: sdk
+          load: true
+          set: |
+            sdk.tags=${{ env.SDK_IMAGE }}
+            sdk.contexts.toolchain=docker-image://${{ needs.sdk.outputs.toolchain }}
+            sdk.contexts.qemu=docker-image://${{ needs.sdk.outputs.qemu }}
+            sdk.contexts.sail=docker-image://${{ needs.sdk.outputs.sail }}
+
+      # The models and the CMake and Ninja releases, about 1 GB. The pins
+      # are in the script, so a change of pins changes the key.
+      - name: Cache the downloads
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.TEST_CACHE }}
+          key: test-llama-${{ hashFiles('scripts/test-llama.sh') }}
+
+      - name: Build and run llama.cpp
+        run: ./scripts/test-llama.sh
+
+      - name: Upload the logs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-llama-logs
+          path: ${{ env.TEST_DIR }}/logs/
+          if-no-files-found: ignore
