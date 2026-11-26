@@ -8,6 +8,7 @@
 #   make sdk                 build the SDK image from source
 #   make toolchain | qemu | sail
 #                            build one component image from source
+#   make test-llama          build llama.cpp with the Zvvm kernels and run it on QEMU
 #   make clean               delete the Apptainer image, image archive and SDK image
 #
 # Maintainer targets, see DEVELOPERS.md:
@@ -45,7 +46,7 @@ export LOCK_DIGEST := $(shell sha256sum $(LOCK) | cut -d' ' -f1)
 BAKE := docker buildx bake -f docker-bake.hcl $(foreach s,$(COMPONENTS) sdk,-f build/$(s)/pins.hcl)
 TAG  := --set sdk.tags=$(IMAGE)
 
-.PHONY: all sdk $(COMPONENTS) lock pins check check-refs hashes print clean
+.PHONY: all sdk $(COMPONENTS) lock pins check check-refs hashes print test-llama clean
 .DEFAULT_GOAL := all
 
 all: $(DIST).sif $(DIST).tar.xz
@@ -94,6 +95,13 @@ $(DIST).sif: sdk
 
 $(DIST).tar.xz: sdk
 	docker save $(IMAGE) | xz -T0 > $@
+
+## Test the SDK: build llama.cpp with the Zvvm kernels and run it on QEMU.
+## Uses the Apptainer image SDK_SIF when it is set, else the Docker image
+## SDK_IMAGE, which defaults to IMAGE. Work directory: out/test-llama.
+SDK_IMAGE ?= $(IMAGE)
+test-llama:
+	SDK_IMAGE=$(SDK_IMAGE) ./scripts/test-llama.sh
 
 ## Delete what `make` produces: every Apptainer image and image archive in
 ## the repo root, and the SDK image tagged IMAGE. BuildKit's

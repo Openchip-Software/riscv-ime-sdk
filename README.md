@@ -95,6 +95,23 @@ docker run --rm -it -u "$(id -u):$(id -g)" -v "$PWD":/work -w /work \
     riscv-ime-sdk:openchip-v<version>
 ```
 
+### Test the SDK
+
+`make test-llama` builds llama.cpp with the IME (Zvvm) kernels with the
+SDK toolchain and runs two small models on the SDK's QEMU. It checks
+that the IME kernels ran. It needs git, curl and Docker or Apptainer,
+about 2 GB of disk in `out/test-llama`, and network access to download
+llama.cpp, CMake, Ninja and the models. The run takes about 15 minutes
+on 4 CPUs. It uses the SDK image that `make` built. To test an Apptainer
+image instead:
+
+```sh
+make test-llama SDK_SIF=riscv-ime-sdk-openchip-v<version>.sif
+```
+
+CI runs the same script in the `test-llama` job; see
+[Tests](DEVELOPERS.md#tests).
+
 ### Make targets
 
 | Target | Does |
@@ -103,6 +120,7 @@ docker run --rm -it -u "$(id -u):$(id -g)" -v "$PWD":/work -w /work \
 | `make sdk` | build the SDK image only |
 | `make toolchain`, `make qemu`, `make sail` | build one component image only |
 | `make print` | print the resolved build definition |
+| `make test-llama` | build llama.cpp with the IME kernels and run it on QEMU |
 | `make clean` | delete the Apptainer images, the image archives and the SDK image |
 
 `make clean` keeps the build cache, which holds most of the disk space.

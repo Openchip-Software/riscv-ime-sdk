@@ -44,7 +44,9 @@ else
 fi
 
 echo "==> no private gitlab.com/vrull refs"
-if git grep -nI 'gitlab\.com/vrull' -- . "${PROSE[@]}" ; then
+# The group vrull is private. The group vrull-public is public: the
+# llama.cpp test in scripts/test-llama.sh fetches from it.
+if git grep -nI 'gitlab\.com/vrull/' -- . "${PROSE[@]}" ; then
     bad "private VRULL GitLab reference in the build path"
 else
     note "clean"
