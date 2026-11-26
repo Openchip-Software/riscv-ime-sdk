@@ -1,0 +1,4 @@
+[submodule "examples"]
+	path = examples
+	url = https://github.com/Openchip-Software/riscv-ime-examples.git
+	branch = main
