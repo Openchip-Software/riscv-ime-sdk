@@ -24,6 +24,14 @@ The `bin` directories of all three are on `PATH`. `QEMU_LD_PREFIX` points at the
 so `qemu-riscv64 ./prog` runs a dynamically linked program without `-L`.
 `QEMU_CPU` sets the default CPU model to `max,x-zvvm=true,vlen=2048`.
 
+## Examples
+
+`examples/` is a git submodule of
+[`riscv-ime-examples`](https://github.com/Openchip-Software/riscv-ime-examples),
+a set of IME example programs built with the SDK. Clone with
+`--recurse-submodules` to get it, or run `git submodule update --init`
+in an existing clone. See `examples/README.md` for how to build and run them.
+
 
 ## Build it
 

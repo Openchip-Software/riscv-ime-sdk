@@ -40,6 +40,12 @@ The lock is the integration gate. Anyone can push to a component repo at
 any time, but nothing reaches the SDK until a PR here changes the
 component's commit in `sdk.lock.yaml`.
 
+`examples/` is a git submodule, not a component. The SDK build does not
+read it, so it is not in `components.yaml` or the lock. Its commit is the
+gitlink in this repo's tree. To move it to the head of the `main` branch of
+`riscv-ime-examples`, run `git submodule update --remote examples` and
+commit the new gitlink.
+
 ## Maintainer make targets
 
 These are in addition to the targets in
@@ -151,6 +157,7 @@ build/toolchain/         Dockerfile, crosstool-NG defconfig template, pins.hcl
 build/qemu/              Dockerfile, pins.hcl
 build/sail/              Dockerfile, pins.hcl
 build/sdk/               Dockerfile of the SDK image, pins.hcl
+examples/                git submodule: riscv-ime-examples, not part of the build
 scripts/                 make-lock.sh, resolve.sh, check-pins.sh, check-lock.sh, check-refs.sh
 .github/workflows/       sdk (pins and lock checks, component and SDK images)
 .github/actions/         free-disk, setup-yq
